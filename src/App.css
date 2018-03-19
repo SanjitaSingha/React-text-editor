@@ -1,0 +1,135 @@
+
+.App {
+  display: flex;
+
+}
+ul {
+  padding-left: 15px;
+}
+.hide {
+  display: none;
+}
+.button {
+  font-size: 11px;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  border: none;
+  background-color: #3a3a3a;
+  margin: 0 4px 10px 8px;
+  height: 30px;
+  width: 70px;
+  box-shadow: 0px 3px 0px 0px #222121, inset -1px -3px 10px 1px #515151;
+}
+
+button:active, .delButton:active {
+    transform: translate(0px, 3px);
+    box-shadow: none;
+}
+.delButton {
+  border-radius: 5px;
+  color: white;
+  cursor: pointer;
+  border: none;
+  background-color: #3a3a3a;
+  height: 20px;
+  width: 40px;
+  box-shadow: 0px 3px 0px 0px #222121, inset -1px -3px 10px 1px #515151;
+  /*display: flex;
+  justify-content: flex-end;*/
+  margin-top: 10px;
+  font-size: 13px;
+  padding: 2px 10px;
+  margin-left: 40px;
+}
+
+.editor-container {
+  background-color: rgba(0,0,0,0.7);
+  height: 90vh;
+  width: 100%;
+  color: white;
+  overflow-y: scroll;
+}
+button:focus {
+  outline: none;
+  animation: click 3s linear ease-in-out;
+}
+.right-side {
+  border-right: 1px solid black;
+  width: 70%;
+  height: 90vh;
+  overflow-y: scroll;
+}
+p {
+  margin: 0;
+}
+.listData {
+  border-bottom: 1px solid orange;
+  padding: 10px;
+  margin: 0;
+}
+.listData:hover {
+  cursor: pointer;
+  box-shadow: inset 0px 0px 10px 5px orange;
+}
+.textarea {
+  flex: 1;
+  border: 1px solid rgba(0,0,0,0.7);
+  padding: 5px;
+  margin-left: 15px;
+}
+.editor {
+  padding: 5px;
+  height: inherit;
+}
+.editor:focus,.textarea:focus {
+  outline: none
+}
+
+.App-logo {
+  animation: App-logo-spin infinite 20s linear;
+  height: 80px;
+}
+.button-contain {
+  /*box-shadow: 0px 0px 1px 2px black;
+  height: 45px;*/
+  position: absolute;;
+  /*width: 210px;*/
+  top: 5px;
+  left: 250px;
+  visibility: hidden;
+}
+.button-list:after {
+  content: '';
+  position: absolute;
+  top: 45px;
+  border-width: 10px 10px 0px 10px;
+  border-color: black transparent transparent transparent;
+  border-style: solid;
+  display: block;
+  left: 50%;
+}
+
+.button-list {
+  display: flex;
+  height: inherit;
+  padding: 0px;
+  position: relative;
+}
+.button-list button {
+  height: 45px;
+  background-color: rgba(0,0,0,.85);
+  color: white;
+  border-width: 1px 1px;
+  border-color: black;
+  width: 70px;
+}
+.button-list button:hover {
+  cursor: pointer;
+  color: orange;
+  box-shadow: 0px 0px 2px 2px black;
+}
+@keyframes App-logo-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
