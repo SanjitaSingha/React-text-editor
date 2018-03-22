@@ -3,47 +3,81 @@ import './App.css';
 import Editor from 'react-medium-editor';
 import { connect } from 'react-redux';
 import renderHTML from 'react-render-html';
+// import {
+//   Editor,
+//   createEditorState,
+// } from 'medium-draft';
 import { addListItem } from './actions'
 
 var id = 0;
+
 class App extends Component {
-  state = {
-    inputValue: '',
-    data: [],
-    clickedData: '',
-    clicked: false,
-    new: true,
-    child: false,
-    collapsed: false,
-    buttonText: '-',
+  constructor(props) {
+    super(props);
+    this.state = {
+      inputValue: '',
+      title: 'Untitled',
+      editorSearchTerm: '',
+      listSearchTerm: '',
+      data: [],
+      clickedData: '',
+      clicked: false,
+      new: true,
+      child: false,
+      collapsed: false,
+      parentEdit: false,
+      buttonText: '-',
+      // editorState: createEditorState()
+    };
+    // this.onChange = (editorState) => {
+    //   this.setState({ editorState });
+    // };
   }
+
   componentWillReceiveProps(nextProps) {
     this.setState({ data: nextProps.item });
   }
+
+  // componentDidMount() {
+  //   this.refs.editor.focus();
+  // }
+
+  onChange(editorState) {
+      this.setState({ editorState });
+  }
+  // componentDidMount() {
+  //     this.setState({ data: this.props.item });
+  //
+  // }
   onSubmit(e) {
     var obj = {};
-    console.log('clickedData', this.state.clickedData);
+    // console.log('item', this.props.item);
     // for edit
     if(!this.state.child && this.state.clickedData.id){
       obj.id = Number(this.state.clickedData.id);
-      obj.data = this.state.inputValue;
+      var sentence = this.state.inputValue.replace('<p>', '');
+      sentence = sentence.replace('</p>', '');
+      obj.data = sentence;
       var d = this.props.item.filter(a => {
         if(a.id === Number(this.state.clickedData.id)) {
           return true;
         }
       });
       obj.parent = d[0].parent;
+      if(d[0].parent === '') { obj.title = this.state.title } ;
       var c = this.props.item.filter(a => {
         if(a.id !== Number(this.state.clickedData.id)) {
           return true;
         }
       });
-      console.log('EDIT', c);
+      // console.log('EDIT', c);
       c.push(obj);
       this.props.addListItem(c);
       this.setState({
         clickedData: {},
         child: false,
+        parentEdit: false,
+        title: 'Untitled'
       });
     }
     // for child node
@@ -54,14 +88,15 @@ class App extends Component {
       obj.data = sentence;
       obj.parent = this.state.clickedData.id;
       id++;
-      var data = this.state.data;
+      // console.log('child node', this.props.item, obj);
+      var data = this.props.item;
       data.push(obj);
-      console.log('child node', data);
+
       this.props.addListItem(data);
       this.setState({ child: false })
     }
     else {
-      console.log('NEW', this.state.inputValue, this.state.new);
+      // console.log('NEW', this.state.inputValue, this.state.new);
       if(this.state.inputValue && this.state.new) {
 
         var sentence = this.state.inputValue.replace('<p>', '');
@@ -69,14 +104,14 @@ class App extends Component {
         obj.id = id;
         obj.data = sentence;
         obj.parent = "";
-
+        obj.title = this.state.title;
         id++;
         // listData = this.props.item;
-        var ab = this.state.data;
-          console.log('SUBMIT', ab);
+        var ab = this.props.item;
+          // console.log('SUBMIT', ab);
         ab.push(obj);
         this.props.addListItem(ab);
-        this.setState({ clickedData: {}, new: false });
+        this.setState({ clickedData: {}, new: false, title: 'Untitled' });
       }
     }
   }
@@ -88,26 +123,62 @@ class App extends Component {
       child: false,
       clickedData: {}
     });
-    console.log('New button clicked', this.state.inputValue);
+    // console.log('New button clicked', this.state.inputValue);
   }
 
   onChildClicked() {
     this.setState({
       child: true,
-      new: false
+      new: false,
+      parentEdit: false
     });
   }
 
+
   deleteItem(id) {
-    console.log('delete', id);
-    var c = this.props.item.filter(a => {
-      if(a.id !== Number(id)) {
-        return true;
+    // console.log('delete', id, this.state.data, this.props.item);
+    var answer = window.confirm("Are you Sure you want to delete this list?");
+    if(answer) {
+      const getReducedArr = (data) => {
+        return data.map((obj) => {
+          if (obj !== undefined && obj.id !== Number(id)) {
+            const children = obj.children ? getReducedArr(obj.children) : [];
+            return {
+              ...obj,
+              ...(children.length > 0 ? { children } : Number(id))
+            }
+          }
+        }).filter(data => data !== Number(id))
       }
-    });
-    console.log('DELETED', c);
-    this.props.addListItem(c);
-    this.setState({ inputValue: '' });
+      // console.log(getReducedArr(this.props.item));
+      var filtered = getReducedArr(this.props.item);
+      // var res = filtered.filter(function f(o) {
+      //   console.log(o);
+      //   if (o !== undefined) return true;
+      //
+      //   if (o.children) {
+      //     return (o.children = o.children.filter(f)).length
+      //   }
+      // });
+      var b = filtered.filter(a => {
+        return a !== undefined
+      });
+
+      // var res = b.filter(function f(d) {
+      //
+      //   if(d !== undefined) return true;
+      //   if(d.children) {
+      //     f(d.children);
+      //   }
+      // })
+      // console.log(res);
+      // var children = c.concat(d);
+      // var c = this.filter(this.props.item);
+      // console.log('DELETED', children);
+      this.props.addListItem(b);
+      this.setState({ inputValue: '' });
+    }
+
   }
 //
 //    getSelectedText() {
@@ -143,52 +214,54 @@ class App extends Component {
     this.setState({ clickedButton: i });
   }
 
-  toggle(t, i) {
+  toggle(t, id) {
     var d = t;
-    this.saveClickedButtonId(i);
-    this.setState(function(prevState, props){
-     return {collapsed: !prevState.collapsed}
-    });
-    if(this.state.collapsed && i === this.state.clickedButton) {
-      d.innerHTML = '+'
-    } else {
-      d.innerHTML = '-'
-    }
-    // this.setState({ collapsed: !this.state.collapsed });
+    this.saveClickedButtonId(id);
+    // this.setState(function(prevState, props){
+    //  return {collapsed: !prevState.collapsed}
+    // });
     var c = d.parentNode.nextSibling.childNodes;
-    console.log('TOGGLE OUTER', c, this.state.collapsed);
+    this.setState({ collapsed: !this.state.collapsed }, function () {
+      // console.log(this.state.collapsed, this.state.clickedButton);
+      if(this.state.collapsed && id === this.state.clickedButton) {
+        d.innerHTML = '+'
+      } else {
+        d.innerHTML = '-'
+      }
+      for (var i = 0; i < c.length; i++) {
+        // if(c[i].nodeName === 'LI' || ) {
 
-    for (var i = 0; i < c.length; i++) {
-    	// if(c[i].nodeName === 'LI' || ) {
-
-			    var e = c[i].childNodes;
-            console.log('TOGGLE', c[i], e);
-            if(c[i].nodeName === 'UL') {
-              if(this.state.collapsed) {
-                c[i].classList.add('hide');
-              } else {
-                c[i].classList.remove('hide');
+            var e = c[i].childNodes;
+              // console.log('TOGGLE', c[i], e);
+              if(c[i].nodeName === 'UL') {
+                if(this.state.collapsed) {
+                  c[i].classList.add('hide');
+                } else {
+                  c[i].classList.remove('hide');
+                }
               }
-            }
-          // for(var j = 0; j < e.length; j++) {
-          //   // console.log('TOGGLE', e[j]);
-          //   if(e[j].nodeName === 'DIV') {
-          //     if(this.state.collapsed) {
-          //       e[j].classList.add('hide');
-          //     } else {
-          //       e[j].classList.remove('hide');
-          //     }
-          //   }
+            // for(var j = 0; j < e.length; j++) {
+            //   // console.log('TOGGLE', e[j]);
+            //   if(e[j].nodeName === 'DIV') {
+            //     if(this.state.collapsed) {
+            //       e[j].classList.add('hide');
+            //     } else {
+            //       e[j].classList.remove('hide');
+            //     }
+            //   }
+            // }
           // }
-        // }
-    }
+      }
+    });
+    // this.setState({ collapsed: !this.state.collapsed });
 
+    // console.log('TOGGLE OUTER', c, this.state.collapsed);
   }
 
   clickHandler(e) {
     var target = e.target;
     // this.toggle(target);
-    console.log('clicked DATA', target.getAttribute('id'), target);
+    // console.log('clicked DATA', target);
     var id = target.getAttribute('id');
     if(id) {
       var c = this.props.item.filter(a => {
@@ -196,30 +269,26 @@ class App extends Component {
           return true;
         }
       });
-      console.log('print', c);
       var obj = {};
       obj.id = id;
       obj.data = c[0].data;
+      if(c[0].parent === '') {
+        this.setState({ parentEdit: true, title: c[0].title
+        });
+      } else {
+        this.setState({ parentEdit: false });
+      }
       if(target.getAttribute('id')) {
         this.setState({
           clickedData: obj,
           inputValue: c[0].data,
+          // new: false,
           clicked: true
         });
       }
     }
   }
 
-  // renderInput() {
-  //   if(this.state.clicked) {
-  //     return (
-  //       <div style={{ display: 'flex', flex: 1 }}>
-  //         <textarea className="textarea"></textarea>
-  //         <span onClick={() => { console.log('This is span click'); this.setState({ clicked: false }); }}>close</span>
-  //       </div>
-  //     )
-  //   }
-  // }
 
   text_truncate = function(str, length, ending) {
     if (length == null) {
@@ -248,7 +317,7 @@ class App extends Component {
     }
     // function to recursively build the tree
     var findChildren = function(parent) {
-        if (children[parent.id]) {
+        if (children[parent.id] && children[parent.id] !== undefined) {
             parent.children = children[parent.id];
             for (var i = 0, len = parent.children.length; i < len; ++i) {
                 findChildren(parent.children[i]);
@@ -264,7 +333,7 @@ class App extends Component {
   }
 
   renderButton(i) {
-    console.log('ID', i);
+    // console.log('ID', i);
       return <button id={i} style={{ alignSelf: 'flex-start' }} onClick={(e) => this.toggle(e.target, i)}>{this.state.buttonText}</button>;
     }
 
@@ -272,37 +341,96 @@ class App extends Component {
   renderList(list) {
     console.log("LIST DATA", list);
     return list.map((d, i) => {
-      return (
-        <div>
-        {d.children && <div>{this.renderButton(d.id)}</div>}
-        <li key={d.id} id={d.id} className="listData">
 
-          {renderHTML(this.text_truncate(d.data,60))}
-          {/*this.renderInput()*/}
-          <span className="delButton" id={d.id} onClick={() => this.deleteItem(d.id)}>del</span>
-          {d.children && <ul>{this.renderList(d.children)}</ul>}
-        </li>
-        </div>
-      );
+      if(d !== undefined) {
+        if(this.state.listSearchTerm) {
+          const regex = new RegExp(this.state.listSearchTerm, 'gi');
+          var newData = d.data.replace(regex, `<span class="highlight">${this.state.listSearchTerm}</span>`);
+          var newTitle = d.title ? d.title.replace(regex, `<span class="highlight">${this.state.listSearchTerm}</span>`) : null;
+          return (
+            <div>
+              {d.title && <p className="title">{renderHTML(newTitle)}</p>}
+              {d.children && <div>{this.renderButton(d.id)}</div>}
+              <li key={d.id} id={d.id} className="listData">
 
+                {renderHTML(this.text_truncate(newData,60))}
+                {/*this.renderInput()*/}
+                <span className="delButton" id={d.id} onClick={() => this.deleteItem(d.id)}>del</span>
+                {d.children && <ul>{this.renderList(d.children)}</ul>}
+              </li>
+            </div>
+          );
+        }
+        else {
+          return (
+            <div>
+              {d.title && <p className="title">{renderHTML(d.title)}</p>}
+              {d.children && <div>{this.renderButton(d.id)}</div>}
+              <li key={d.id} id={d.id} className="listData">
+
+                {renderHTML(this.text_truncate(d.data,60))}
+                {/*this.renderInput()*/}
+                <span className="delButton" id={d.id} onClick={() => this.deleteItem(d.id)}>del</span>
+                {d.children && <ul>{this.renderList(d.children)}</ul>}
+              </li>
+            </div>
+          );
+        }
+
+
+      }
     });
   }
 
+  onChangeSearchTerm(e, a) {
+    if(a === 'title') {
+      this.setState({ title: e.target.value });
+    } else {
+      this.setState({ listSearchTerm: e.target.value });
+    }
+  }
+  
+  searchItem(wordToMatch, b) {
+   return b.filter(function f(d) {
+     const regex = new RegExp(wordToMatch, 'gi');
+     console.log(d);
+     if (d.children) {
+       return (d.children = d.children.filter(f)).length
+     } else {
+       if(d.title) {
+         console.log('Search title child', d);
+         return d.data.match(regex) || d.title.match(regex);
+       } else {
+         console.log('Search no title child', d);
+         return d.data.match(regex);
+       }
+     }
+   });
+  }
+
+
   render() {
-    var list = this.deStructureData(this.state.data);
-    console.log(list);
+    console.log('SEARCH', this.searchItem(this.state.listSearchTerm, this.props.item));
+    var dataOption = this.state.listSearchTerm ? this.searchItem(this.state.listSearchTerm, this.props.item) : this.props.item;
+    var list = this.deStructureData(dataOption);
+
+    console.log('LIST deStructureData', this.props.item, list);
+    // var text = this.state.editorSearchTerm ?
     return (
-      <div>
+      <div style={{ height: '100vh' }}>
         <div style={{ display: 'flex', justifyContent: 'flex-end', margin: 5 }}>
           <button className="button" onClick={(e) => this.onSubmit(e)}>Save</button>
           <button className="button" onClick={(e) => this.onNewClicked(e)}>New</button>
           <button className="button" onClick={(e) => this.onChildClicked(e)}>Child node</button>
         </div>
+
         <div className="App">
+
           <div className="right-side">
+            <input Placeholder="Search list.." value={this.state.listSearchTerm} onChange={(e) => this.onChangeSearchTerm(e)}/>
 
             <ul id="list" onClick={(e) => { this.clickHandler(e); }}>
-              {this.renderList(list)}
+              {list !== undefined && this.renderList(list)}
             </ul>
 
 
@@ -312,6 +440,7 @@ class App extends Component {
             onChange={(e) => this.onChange(e) } onKeyUp={(e) => this.onSubmit(e)} >
           </textarea>*/}
           <div className="editor-container">
+            <input Placeholder="Title.." value={this.state.title} onChange={(text) => this.onChangeSearchTerm(text, 'title')} disabled = {(this.state.new || this.state.parentEdit)? "" : "disabled"}/>
             <Editor
               className="editor"
               value={this.state.inputValue}
