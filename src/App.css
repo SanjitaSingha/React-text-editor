@@ -1,6 +1,12 @@
 body {
   height: 100vh;
 }
+mark {
+  background-color: orange;
+}
+.md-inline-highlight {
+  background-color: yellow;
+}
 .App {
   display: flex;
   height: inherit;
@@ -9,13 +15,19 @@ body {
 .highlight {
   background-color: orange;
 }
-ul {
+.md-RichEditor-root {
+  height: inherit;
+  color: rgba(255,255,255,.7);
+  background-color: transparent;
+}
+ul, ol {
   padding-left: 15px;
 }
 .title {
   font-size: 15px;
   font-weight: bold;
   color: blue;
+  margin-bottom: 7px;
 }
 input {
   border: none;
@@ -50,16 +62,14 @@ button:active, .delButton:active {
   cursor: pointer;
   border: none;
   background-color: #3a3a3a;
-  height: 20px;
-  width: 40px;
   box-shadow: 0px 3px 0px 0px #222121, inset -1px -3px 10px 1px #515151;
-  /*display: flex;
-  justify-content: flex-end;*/
-  margin-top: 10px;
   font-size: 13px;
-  padding: 2px 10px;
-  margin-left: 40px;
-  opacity: 0
+  padding: 1px 5px;
+  opacity: 0;
+  position: absolute;
+  top: 7px;
+  right: 15px;
+
 }
 
 .editor-container {
@@ -84,15 +94,21 @@ button:focus {
 p {
   margin: 0;
 }
+
 .listData {
-  border-bottom: 1px solid orange;
+  /*border-bottom: 1px solid orange;*/
   padding: 10px;
   margin: 0;
   font-size: 14px;
+  position: relative;
+  list-style: none;
+  color: rgba(0, 0, 0, 0.7);
+  width: 100%;
 }
 .listData:hover {
   cursor: pointer;
   box-shadow: inset 0px 0px 10px 5px orange;
+  color: rgba(0,0,0,1)
 }
 .listData:hover > .delButton { opacity: 1 ; }
 .textarea {
@@ -151,6 +167,17 @@ p {
   cursor: pointer;
   color: orange;
   box-shadow: 0px 0px 2px 2px black;
+}
+
+.collapsedButton {
+  align-self: 'flex-start';
+  margin-top: 10px;
+  font-size: 15px;
+  font-weight: bold;
+  /*padding: 0px;*/
+}
+.collapsedButton:hover {
+  cursor: pointer;
 }
 @keyframes App-logo-spin {
   from { transform: rotate(0deg); }
