@@ -135,7 +135,7 @@ class App extends Component {
     }
     localStorage.removeItem('title');
     localStorage.removeItem('editorText');
-
+    this.setState({ editorState: createEditorState() });
   }
 
   onNewClicked() {
@@ -145,6 +145,7 @@ class App extends Component {
       child: false,
       clickedData: {}
     });
+    this.titleInput.focus();
     // console.log('New button clicked', this.state.inputValue);
   }
 
@@ -241,7 +242,7 @@ class App extends Component {
   importDataToEditor(e) {
     const html = e;
     const editorState = createEditorState(convertToRaw(mediumDraftImporter(html)));
-    console.log('importDataToEditor', editorState);
+    // console.log('importDataToEditor', editorState);
     this.setState({ editorState });
   }
 
@@ -463,7 +464,12 @@ class App extends Component {
           </div>
 
           <div className="editor-container">
-            <input Placeholder="Title.." value={this.state.title} onChange={(text) => this.onChangeSearchTerm(text, 'title')} disabled = {(this.state.new || this.state.parentEdit)? "" : "disabled"}/>
+            <input Placeholder="Title.."
+              value={this.state.title}
+              onChange={(text) => this.onChangeSearchTerm(text, 'title')}
+              disabled = {(this.state.new || this.state.parentEdit)? "" : "disabled"}
+              ref={input => this.titleInput = input}
+            />
             {/*<Editor
               className="editor"
               value={this.state.inputValue}
