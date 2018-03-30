@@ -4,8 +4,8 @@ const INITIAL_STATE = {
 
 export default (state = INITIAL_STATE, action) => {
   switch (action.type) {
-    case 'ADD_ITEM':
-      
+    case 'FETCH_ITEM':
+
       return { ...state, items: action.payload };
     default:
       return { ...state }

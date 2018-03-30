@@ -3,6 +3,7 @@ import './App.css';
 // import Editor from 'react-medium-editor';
 import { connect } from 'react-redux';
 import renderHTML from 'react-render-html';
+import { Route } from 'react-router-dom';
 import {
   Editor,
   createEditorState,
@@ -10,9 +11,11 @@ import {
 import mediumDraftExporter from 'medium-draft/lib/exporter';
 import mediumDraftImporter from 'medium-draft/lib/importer';
 import { convertToRaw } from 'draft-js'
-import { addListItem } from './actions'
+import firebase from 'firebase';
+import { addListItem, logOut, fetchItem } from './actions'
 var sampleText;
 var id = 0;
+// var list;
 class App extends Component {
   constructor(props) {
     super(props);
@@ -47,13 +50,27 @@ class App extends Component {
     };
   }
 
-  componentWillReceiveProps(nextProps) {
-    this.setState({ data: nextProps.item });
-    // sampleText = window.document.getElementById('list').innerHTML;
+  // componentWillReceiveProps(nextProps) {
+  //   this.setState({ data: nextProps.item });
+  //   // sampleText = window.document.getElementById('list').innerHTML;
+  //
+  // }
+
+  componentWillMount() {
+    const { currentUser } =firebase.auth();
+    this.props.fetchItem(currentUser.uid);
+    firebase.auth().onAuthStateChanged((user) => {
+      console.log('USER', user);
+      if (user) {
+        this.setState({ loggedIn: true });
+      } else {
+        this.setState({ loggedIn: false });
+      }
+    });
   }
 
   componentDidMount() {
-    this.refs.editor.focus();
+
     var html = localStorage.getItem('editorText');
     if(html) {
       console.log('EDITOR TEXT', html);
@@ -65,6 +82,7 @@ class App extends Component {
 
   }
 
+
   onSubmit(e) {
     var obj = {};
     this.setState({
@@ -72,25 +90,15 @@ class App extends Component {
     });
     // for edit
     if(!this.state.child && this.state.clickedData.id){
-      obj.id = Number(this.state.clickedData.id);
-      var sentence = this.state.draftInfo.replace('<p>', '');
+      // obj.id = this.state.clickedData.id;
+      const id = this.state.clickedData.id;
+      var sentence = this.state.draftInfo.replace('<p class="md-block-unstyled">', '');
       sentence = sentence.replace('</p>', '');
       obj.data = sentence;
-      var d = this.props.item.filter(a => {
-        if(a.id === Number(this.state.clickedData.id)) {
-          return true;
-        }
-      });
-      obj.parent = d[0].parent;
-      if(d[0].parent === '') { obj.title = this.state.title } ;
-      var c = this.props.item.filter(a => {
-        if(a.id !== Number(this.state.clickedData.id)) {
-          return true;
-        }
-      });
-      // console.log('EDIT', c);
-      c.push(obj);
-      this.props.addListItem(c);
+      obj.title = this.state.title;
+      const { currentUser } = firebase.auth();
+      firebase.database().ref(`root/${currentUser.uid}/list/${id}`).update(obj);
+
       this.setState({
         clickedData: {},
         child: false,
@@ -100,17 +108,17 @@ class App extends Component {
     }
     // for child node
     if(this.state.child && this.state.clickedData.id) {
-      var sentence = this.state.draftInfo.replace('<p>', '');
+      var sentence = this.state.draftInfo.replace('<p class="md-block-unstyled">', '');
       sentence = sentence.replace('</p>', '');
+      const { currentUser } = firebase.auth();
+      // console.log('ID..', firebase.database().ref().child(`/root/${currentUser.uid}/list`).push().key);
+      const id = firebase.database().ref().child(`/root/${currentUser.uid}/list`).push().key;
       obj.id = id;
       obj.data = sentence;
       obj.parent = this.state.clickedData.id;
-      id++;
-      // console.log('child node', this.props.item, obj);
-      var data = this.props.item;
-      data.push(obj);
-
-      this.props.addListItem(data);
+      obj.title = "";
+      console.log('Child node to be added', obj);
+      this.props.addListItem(obj, id);
       this.setState({ child: false });
     }
     else {
@@ -119,16 +127,15 @@ class App extends Component {
 
         var sentence = this.state.draftInfo.replace('<p class="md-block-unstyled">', '');
         sentence = sentence.replace('</p>', '');
+        const { currentUser } = firebase.auth();
+        // console.log('ID..', firebase.database().ref().child(`/root/${currentUser.uid}/list`).push().key);
+        const id = firebase.database().ref().child(`/root/${currentUser.uid}/list`).push().key;
         obj.id = id;
         obj.data = sentence;
         obj.parent = "";
         obj.title = this.state.title ? this.state.title : 'Untitled';
-        id++;
-        // listData = this.props.item;
-        var ab = this.props.item;
-          // console.log('SUBMIT', ab);
-        ab.push(obj);
-        this.props.addListItem(ab);
+
+        this.props.addListItem(obj, id);
         this.setState({ clickedData: {}, new: false, title: '' });
 
       }
@@ -143,7 +150,8 @@ class App extends Component {
       new: true,
       inputValue: '',
       child: false,
-      clickedData: {}
+      clickedData: {},
+      title: '',
     });
     this.titleInput.focus();
     // console.log('New button clicked', this.state.inputValue);
@@ -153,7 +161,8 @@ class App extends Component {
     this.setState({
       child: true,
       new: false,
-      parentEdit: false
+      parentEdit: false,
+      title: '',
     });
   }
 
@@ -162,25 +171,28 @@ class App extends Component {
     // console.log('delete', id, this.state.data, this.props.item);
     var answer = window.confirm("Are you Sure you want to delete this list?");
     if(answer) {
-      const getReducedArr = (data) => {
-        return data.map((obj) => {
-          if (obj !== undefined && obj.id !== Number(id)) {
-            const children = obj.children ? getReducedArr(obj.children) : [];
-            return {
-              ...obj,
-              ...(children.length > 0 ? { children } : Number(id))
-            }
-          }
-        }).filter(data => data !== Number(id))
-      }
+      // const getReducedArr = (data) => {
+      //   return data.map((obj) => {
+      //     if (obj !== undefined && obj.id !== id) {
+      //       const children = obj.children ? getReducedArr(obj.children) : [];
+      //       return {
+      //         ...obj,
+      //         ...(children.length > 0 ? { children } : Number(id))
+      //       }
+      //     }
+      //   }).filter(data => data !== Number(id))
+      // }
+
+      const { currentUser } = firebase.auth();
+      firebase.database().ref(`/root/${currentUser.uid}/list/${id}`).remove();
       // console.log(getReducedArr(this.props.item));
-      var filtered = getReducedArr(this.props.item);
+      // var filtered = getReducedArr(this.props.item);
+      //
+      // var b = filtered.filter(a => {
+      //   return a !== undefined
+      // });
 
-      var b = filtered.filter(a => {
-        return a !== undefined
-      });
-
-      this.props.addListItem(b);
+      // this.props.addListItem(b);
       this.setState({ inputValue: '' });
     }
 
@@ -246,34 +258,31 @@ class App extends Component {
     this.setState({ editorState });
   }
 
-  clickHandler(e) {
+  clickHandler(e, d) {
     var target = e.target;
     var id = target.getAttribute('id');
-    if(id) {
-      var c = this.props.item.filter(a => {
-        if(a.id === Number(id)) {
-          return true;
-        }
-      });
-      this.importDataToEditor(c[0].data);
-      console.log('clicked DATA', id, c[0].data);
+    if(id && id === d.id) {
+
+      this.importDataToEditor(d.data);
+      console.log('clicked DATA', id, d.data);
       var obj = {};
-      obj.id = id;
-      obj.data = c[0].data;
-      if(c[0].parent === '') {
-        this.setState({ parentEdit: true, title: c[0].title
+      obj.id = d.id;
+      obj.data = d.data;
+      obj.parent = d.parent;
+      if(d.parent === '') {
+        this.setState({ parentEdit: true, title: d.title
         });
       } else {
         this.setState({ parentEdit: false });
       }
-      if(target.getAttribute('id')) {
-        this.setState({
-          clickedData: obj,
-          inputValue: c[0].data,
-          // new: false,
-          clicked: true
-        });
-      }
+
+      this.setState({
+        clickedData: obj,
+        inputValue: d.data,
+        new: false,
+        clicked: true
+      });
+
     }
   }
 
@@ -293,32 +302,32 @@ class App extends Component {
   };
 
   deStructureData(arry) {
-    var roots = [], children = {};
+  var data = [], children = {};
 
-    // find the top level nodes and hash the children based on parent
-    for (var i = 0, len = arry.length; i < len; ++i) {
-        var item = arry[i],
-            p = item.parent,
-            target = !p ? roots : (children[p] || (children[p] = []));
+  // find the top level nodes and hash the children based on parent
+  for (var i = 0, len = arry.length; i < len; ++i) {
+      var item = arry[i],
+          p = item.parent,
+          target = !p ? data : (children[p] || (children[p] = []));
 
-        target.push(item);
-    }
-    // function to recursively build the tree
-    var findChildren = function(parent) {
-        if (children[parent.id] && children[parent.id] !== undefined) {
-            parent.children = children[parent.id];
-            for (var i = 0, len = parent.children.length; i < len; ++i) {
-                findChildren(parent.children[i]);
-            }
-        }
-    };
-
-    for (var j = 0, ln = roots.length; j < ln; ++j) {
-        findChildren(roots[j]);
-    }
-
-    return roots;
+      target.push(item);
   }
+  // function to recursively build the tree
+  var findChildren = function(parent) {
+      if (children[parent.id]) {
+          parent.children = children[parent.id];
+          for (var i = 0, len = parent.children.length; i < len; ++i) {
+              findChildren(parent.children[i]);
+          }
+      }
+  };
+
+  for (var j = 0, ln = data.length; j < ln; ++j) {
+      findChildren(data[j]);
+  }
+
+  return data;
+}
 
   renderButton(i) {
     // console.log('ID', i);
@@ -326,7 +335,7 @@ class App extends Component {
     }
 
   renderList(list) {
-    console.log("LIST DATA", list);
+    // console.log("LIST DATA", list);
     return list.map((d, i) => {
 
       if(d !== undefined) {
@@ -352,15 +361,18 @@ class App extends Component {
         //   );
         // }
         // else {
+          var data = this.highlightElement(d.data, this.state.listSearchTerm) || d.data;
+          var title = this.highlightElement(d.title, this.state.listSearchTerm) || d.title;
+
           return (
             <div style={{ display: 'flex' }}>
 
 
               {d.children && <div>{this.renderButton(d.id)}</div>}
 
-              <li key={d.id} id={d.id} className="listData">
-                {d.title && <p className="title">{renderHTML(d.title)}</p>}
-                {renderHTML(this.text_truncate(d.data,150))}
+              <li key={d.id} id={d.id} className="listData" onClick={(e) => { this.clickHandler(e, d); }}>
+                {d.title && <p className="title">{renderHTML(title)}</p>}
+                {renderHTML(this.text_truncate(data,150))}
                 {/*this.renderInput()*/}
                 <span className="delButton" id={d.id} onClick={() => this.deleteItem(d.id)}>
                   <i className="fa fa-trash" />
@@ -381,31 +393,21 @@ class App extends Component {
       this.setState({ title: e.target.value }, function() {
         localStorage.setItem('title', this.state.title);
       });
+    } else {
+      this.setState({ listSearchTerm: e.target.value });
     }
-    if((a !== 'title') && (this.state.listSearchTerm === '')) {
-      sampleText = window.document.getElementById('list').innerHTML;
-      // sampleText = sampleText.replace(/<[^\/>][^>]*><\/[^>]+>/gim, "");
-      sampleText = sampleText.replace(/<mark[^>]*(?:\/>|>(?:\s|&nbsp;)*<\/mark>)/gim, '');
-      // to remove empty tag
-      console.log('SAMPLE TEXT', sampleText);
-    }
-
-    if(!a) {
-
-      this.setState({ listSearchTerm: e.target.value }, function() {
-
-        var newText = this.highlightElement(sampleText, this.state.listSearchTerm);
-        console.log('NEW TEXT', this.state.listSearchTerm, newText);
-        window.document.getElementById('list').innerHTML = newText;
-
-      });
-
-    }
+    // if((a !== 'title') && (this.state.listSearchTerm === '')) {
+    //   sampleText = window.document.getElementById('list').innerHTML;
+    //   // sampleText = sampleText.replace(/<[^\/>][^>]*><\/[^>]+>/gim, "");
+    //   sampleText = sampleText.replace(/<mark[^>]*(?:\/>|>(?:\s|&nbsp;)*<\/mark>)/gim, '');
+    //   // to remove empty tag
+    //   console.log('SAMPLE TEXT', sampleText);
+    // }
 
   }
 
   highlightElement(text, term) {
-    if(text) {
+    if(text && term) {
       var pattern = new RegExp('('+term+')(?![^<]*>)', 'gi');
       // var text1 = text.replace(/<mark[^>]*(?:\/>|>(?:\s|&nbsp;)*<\/mark>)/im, '');
       text = text.replace(pattern, '<mark>$1</mark>');
@@ -436,14 +438,18 @@ class App extends Component {
 
 
   render() {
-    // console.log('SEARCH', this.searchItem(this.state.listSearchTerm, this.props.item));
     var dataOption = this.state.listSearchTerm ? this.searchItem(this.state.listSearchTerm, this.props.item) : this.props.item;
     var list = this.deStructureData(dataOption);
-    console.log('LIST deStructureData', this.props.item, list);
+    console.log('LIST deStructureData', list);
+
     // var text = this.state.editorSearchTerm ?
 
     return (
+      this.state.loggedIn ?
       <div style={{ height: '100vh' }}>
+        <Route render={({ history }) => (
+          <button onClick={() => this.props.logOut(history)}>logout</button>
+        )} />
         <div style={{ display: 'flex', justifyContent: 'flex-end', margin: 5 }}>
 
           <button className="button" onClick={(e) => this.onSubmit(e)}>Save</button>
@@ -454,9 +460,9 @@ class App extends Component {
         <div className="App">
 
           <div className="right-side">
-            <input Placeholder="Search list.." value={this.state.listSearchTerm} onChange={(e) => this.onChangeSearchTerm(e)}/>
+            <input placeholder="Search list.." value={this.state.listSearchTerm} onChange={(e) => this.onChangeSearchTerm(e)}/>
 
-            <ul id="list" onClick={(e) => { this.clickHandler(e); }}>
+            <ul id="list">
 
               {list !== undefined && this.renderList(list)}
             </ul>
@@ -464,7 +470,7 @@ class App extends Component {
           </div>
 
           <div className="editor-container">
-            <input Placeholder="Title.."
+            <input placeholder="Title.."
               value={this.state.title}
               onChange={(text) => this.onChangeSearchTerm(text, 'title')}
               disabled = {(this.state.new || this.state.parentEdit)? "" : "disabled"}
@@ -483,14 +489,15 @@ class App extends Component {
           </div>
         </div>
 
-      </div>
+      </div> :
+      <div>Login</div>
     );
   }
 }
 const mapStateToProps = (state) => {
   return {
-    item: state.item.items
+    item: state.item.items,
   }
 }
 
-export default connect(mapStateToProps, {addListItem})(App);
+export default connect(mapStateToProps, {addListItem, logOut, fetchItem})(App);

@@ -10,10 +10,11 @@ import registerServiceWorker from './registerServiceWorker';
 import { createStore, applyMiddleware } from 'redux';
 import { Provider } from 'react-redux';
 import thunk from 'redux-thunk';
-import logger from 'redux-logger';
+import { logger } from 'redux-logger';
 import rootReducer from './reducers';
+import  Routes  from './router';
 
 const createStoreWithMiddleware = applyMiddleware(thunk, logger)(createStore);
 
-ReactDOM.render(<Provider store={createStoreWithMiddleware(rootReducer)}><App /></Provider>, document.getElementById('root'));
+ReactDOM.render(<Provider store={createStoreWithMiddleware(rootReducer)}><Routes /></Provider>, document.getElementById('root'));
 registerServiceWorker();
