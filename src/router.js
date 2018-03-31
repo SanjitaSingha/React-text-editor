@@ -14,7 +14,7 @@ const PrivateRoute = ({ component: Component, authed, ...rest }) => (
   <Route {...rest} render={(props) => (
     authed
       ? <Component {...props} />
-      : <Redirect to='/' />
+      : <Redirect to='/login' />
   )} />
 );
 
@@ -36,6 +36,7 @@ export default class Routes extends Component {
       }
     });
   }
+
   render() {
     return (
       <Router>

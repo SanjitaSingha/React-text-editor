@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { Link, Route } from 'react-router-dom';
+import { Link, Route, Redirect } from 'react-router-dom';
 import firebase from 'firebase';
 import { connect } from 'react-redux';
 import { fbLogin } from '../actions';
@@ -49,11 +49,7 @@ login(history) {
 }
 renderPage() {
   if(this.state.loggedIn) {
-    return (
-      <div>
-        data
-      </div>
-    );
+    return <Redirect to='/' />
   } else if(this.state.loggedIn === null) {
     return (
       <div>Spinning....</div>
@@ -72,12 +68,7 @@ renderPage() {
 
   render() {
     return (
-      <div>
-        Login PAge
-        <Route render={({ history }) => (
-          <button  onClick={(e) => this.login(history)}>Login with Facebook</button>
-        )} />
-      </div>
+      this.renderPage()
     )
   }
 }
