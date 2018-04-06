@@ -41,7 +41,11 @@ export const fbLogin = (history) => {
         obj.token = currentUser.uid;
         obj.userName = currentUser.displayName;
         obj.email = currentUser.email;
+        obj.image = currentUser.photoURL;
         console.log('Current USer', obj, currentUser);
+        // var storageRef = firebase.storage().ref(`/users/${fileName}`);
+        //
+        // var uploadTask = storageRef.put(file);
         firebase.database().ref('users/'+ currentUser.uid).set(obj);
         // firebase.database().ref(`users`).push(obj);
         dispatch({ type: 'LOGIN_SUCCESSFUL', payload: obj });

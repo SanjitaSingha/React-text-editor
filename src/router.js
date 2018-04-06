@@ -8,6 +8,7 @@ import {
 import React, { Component } from 'react';
 import Login from './components/Login';
 import App from './App';
+import Share from './components/Share';
 import firebase from 'firebase';
 
 const PrivateRoute = ({ component: Component, authed, ...rest }) => (
@@ -42,6 +43,7 @@ export default class Routes extends Component {
       <Router>
         <Switch>
           <Route path='/login' component={Login} />
+          <Route path='/share/:id' component={Share} />
           <PrivateRoute authed={this.state.loggedIn} path='/' component={App} />
         </Switch>
       </Router>

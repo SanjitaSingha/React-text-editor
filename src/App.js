@@ -8,14 +8,18 @@ import {
   Editor,
   createEditorState,
 } from 'medium-draft';
+
 import mediumDraftExporter from 'medium-draft/lib/exporter';
 import mediumDraftImporter from 'medium-draft/lib/importer';
 import { convertToRaw } from 'draft-js'
 import firebase from 'firebase';
-import { addListItem, logOut, fetchItem } from './actions'
+import { addListItem, logOut, fetchItem, SingleUserFetch } from './actions'
+import CustomImageSideButton from './components/CustomImageSideButton';
 var sampleText;
 var id = 0;
+
 // var list;
+
 class App extends Component {
   constructor(props) {
     super(props);
@@ -31,9 +35,13 @@ class App extends Component {
       child: false,
       collapsed: false,
       parentEdit: false,
-      buttonText: '-',
+      buttonText: <i className="fa fa-caret-right" />,
       editorState: createEditorState()
     };
+    this.sideButtons = [{
+      title: 'Image',
+      component: CustomImageSideButton,
+    }];
     this.onChange = (editorState) => {
       // console.log(convertToRaw(this.state.editorState.getCurrentContent()));
       this.setState({ editorState }, function() {
@@ -48,6 +56,9 @@ class App extends Component {
         }
       );
     };
+
+    this.getEditorState = () => this.state.editorState;
+    // this.handleDroppedFiles = this.handleDroppedFiles.bind(this);
   }
 
   // componentWillReceiveProps(nextProps) {
@@ -62,7 +73,8 @@ class App extends Component {
     firebase.auth().onAuthStateChanged((user) => {
       console.log('USER', user);
       if (user) {
-        this.setState({ loggedIn: true });
+        this.props.SingleUserFetch(user.uid);
+        this.setState({ loggedIn: true, src: user.photoURL });
       } else {
         this.setState({ loggedIn: false });
       }
@@ -80,6 +92,224 @@ class App extends Component {
 
     this.setState({ title: localStorage.getItem('title')});
 
+    // Minimum resizable area
+    var minWidth = 150;
+    // Thresholds
+    var FULLSCREEN_MARGINS = -10;
+    var MARGINS = 4;
+
+    // End of what's configurable.
+    var clicked = null;
+    var onRightEdge, onBottomEdge, onLeftEdge, onTopEdge;
+
+    var rightScreenEdge, bottomScreenEdge;
+
+    var preSnapped;
+
+    var b, x, y;
+
+    var redraw = false;
+
+    var pane = document.getElementById('pane');
+    var ghostpane = document.getElementById('ghostpane');
+    var panecontainer = document.getElementById("pane-container");
+
+    function setBounds(element, x, y, w, h) {
+      element.style.left = x + 'px';
+      element.style.top = y + 'px';
+      element.style.width = w + 'px';
+      element.style.height = h + 'px';
+    }
+
+    function hintHide() {
+      console.log('HInt hide run');
+      setBounds(ghostpane, b.left, b.top, b.width, b.height);
+      ghostpane.style.display = 'none';
+    }
+
+
+    // Mouse events
+    pane.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+
+    function onMouseDown(e) {
+      onDown(e);
+      e.preventDefault();
+    }
+
+    function onDown(e) {
+      console.log('Mouse down run', e);
+      calc(e);
+
+      var isResizing = onRightEdge || onBottomEdge || onTopEdge || onLeftEdge;
+
+      clicked = {
+        x: x,
+        y: y,
+        cx: e.clientX,
+        cy: e.clientY,
+        w: b.width,
+        h: b.height,
+        isResizing: isResizing,
+        onRightEdge: onRightEdge
+      };
+    }
+
+
+    function calc(e) {
+      b = pane.getBoundingClientRect();
+
+      x = e.clientX;
+      y = e.clientY;
+      console.log('CAlc', b, x, y);
+      onTopEdge = y < MARGINS;
+      onLeftEdge = x < MARGINS;
+      onRightEdge = x >= b.width - MARGINS;
+      onBottomEdge = y >= b.height - MARGINS;
+
+      rightScreenEdge = window.innerWidth - MARGINS;
+      bottomScreenEdge = window.innerHeight - MARGINS;
+    }
+
+    var e;
+
+    function onMove(ee) {
+      console.log('On move running', ee);
+      calc(ee);
+
+      e = ee;
+
+      redraw = true;
+
+    }
+
+    function animate() {
+
+      requestAnimationFrame(animate);
+
+      if (!redraw) return;
+
+      redraw = false;
+
+      if (clicked && clicked.isResizing) {
+
+        if (clicked.onRightEdge) {
+          pane.style.width = Math.max(x, minWidth) + 'px';
+          // panecontainer.style.width = Math.max(x, minWidth) + 'px';
+        }
+
+        hintHide();
+
+        return;
+      }
+
+      if (clicked && clicked.isMoving) {
+
+        if (preSnapped) {
+          setBounds(pane,
+            e.clientX - preSnapped.width / 2,
+            e.clientY - Math.min(clicked.y, preSnapped.height),
+            preSnapped.width,
+            preSnapped.height
+          );
+
+          return;
+        }
+
+        // moving
+        pane.style.top = (e.clientY - clicked.y) + 'px';
+        pane.style.left = (e.clientX - clicked.x) + 'px';
+
+        return;
+      }
+
+      // This code executes when mouse moves without clicking
+
+      // style cursor
+      if (onRightEdge || onLeftEdge) {
+        pane.style.cursor = 'ew-resize';
+      }else {
+        pane.style.cursor = 'default';
+      }
+    }
+
+    animate();
+
+    function onUp(e) {
+      calc(e);
+
+      if (clicked && clicked.isMoving) {
+        // Snap
+        var snapped = {
+          width: b.width,
+          height: b.height
+        };
+
+        if (b.top < FULLSCREEN_MARGINS || b.left < FULLSCREEN_MARGINS || b.right > window.innerWidth - FULLSCREEN_MARGINS || b.bottom > window.innerHeight - FULLSCREEN_MARGINS) {
+          // hintFull();
+          setBounds(pane, 0, 0, window.innerWidth, window.innerHeight);
+          preSnapped = snapped;
+        } else if (b.top < MARGINS) {
+          // hintTop();
+          setBounds(pane, 0, 0, window.innerWidth, window.innerHeight / 2);
+          preSnapped = snapped;
+        } else if (b.left < MARGINS) {
+          // hintLeft();
+          setBounds(pane, 0, 0, window.innerWidth / 2, window.innerHeight);
+          preSnapped = snapped;
+        } else if (b.right > rightScreenEdge) {
+          // hintRight();
+          setBounds(pane, window.innerWidth / 2, 0, window.innerWidth / 2, window.innerHeight);
+          // setBounds(panecontainer, window.innerWidth / 2, 0, window.innerWidth / 2, window.innerHeight);
+
+          preSnapped = snapped;
+        } else if (b.bottom > bottomScreenEdge) {
+          // hintBottom();
+          setBounds(pane, 0, window.innerHeight / 2, window.innerWidth, window.innerWidth / 2);
+          preSnapped = snapped;
+        } else {
+          preSnapped = null;
+        }
+
+        hintHide();
+
+      }
+
+      clicked = null;
+
+    }
+
+  }
+
+
+
+
+  onShare(e, history) {
+      console.log('Share clickedData', this.state.clickedData);
+      var update = {};
+      var id = this.state.clickedData.id;
+      var arr;
+      if(id) {
+        firebase.database().ref('/share').on('value', snapshot => {
+          const list = snapshot.val();
+          arr = list ? Object.keys(list) : [];
+
+          if(arr.indexOf(id) < 0) {
+            var obj = {};
+            obj.owner = firebase.auth().currentUser.uid;
+            obj.info = this.state.clickedData;
+            update[`/share/${id}`] = obj;
+            firebase.database().ref().update(update);
+          } else {
+            firebase.database().ref().child(`/share/${id}`)
+        .update({ info: this.state.clickedData });
+          }
+        });
+        history.push(`/share/${this.state.clickedData.id}`);
+      } else {
+        window.alert('Please select one list to share');
+      }
   }
 
 
@@ -98,6 +328,7 @@ class App extends Component {
       obj.title = this.state.title;
       const { currentUser } = firebase.auth();
       firebase.database().ref(`root/${currentUser.uid}/list/${id}`).update(obj);
+      firebase.database().ref(`share/${id}/info`).update(obj);
 
       this.setState({
         clickedData: {},
@@ -152,6 +383,7 @@ class App extends Component {
       child: false,
       clickedData: {},
       title: '',
+      editorState: createEditorState(),
     });
     this.titleInput.focus();
     // console.log('New button clicked', this.state.inputValue);
@@ -185,14 +417,7 @@ class App extends Component {
 
       const { currentUser } = firebase.auth();
       firebase.database().ref(`/root/${currentUser.uid}/list/${id}`).remove();
-      // console.log(getReducedArr(this.props.item));
-      // var filtered = getReducedArr(this.props.item);
-      //
-      // var b = filtered.filter(a => {
-      //   return a !== undefined
-      // });
 
-      // this.props.addListItem(b);
       this.setState({ inputValue: '' });
     }
 
@@ -209,46 +434,32 @@ class App extends Component {
     this.setState({ clickedButton: i });
   }
 
-  toggle(t, id) {
-    var d = t;
+  toggle(e, id) {
+    var d = e.target;
     this.saveClickedButtonId(id);
-
-    var c = d.parentNode.nextSibling.childNodes;
+    console.log('TOGGLE', d);
+    var c = d.parentNode.parentNode.parentNode.parentNode.nextSibling;
+    console.log('TOGGLE', d, c);
     this.setState({ collapsed: !this.state.collapsed }, function () {
       // console.log(this.state.collapsed, this.state.clickedButton);
       if(this.state.collapsed && id === this.state.clickedButton) {
-        d.innerHTML = '+'
+        // d.innerHTML = <i className="fa fa-caret-up" />
+        d.classList.remove('fa-caret-right');
+        d.classList.add('fa-caret-down');
+        c.classList.remove('hide');
+        // c.setAttribute("style", "display: block;");
+
       } else {
-        d.innerHTML = '-'
-      }
-      for (var i = 0; i < c.length; i++) {
-        // if(c[i].nodeName === 'LI' || ) {
+        d.classList.remove('fa-caret-down');
+        d.classList.add('fa-caret-right');
+        c.classList.add('hide');
+        // c.setAttribute("style", "display: none;");
 
-            var e = c[i].childNodes;
-              // console.log('TOGGLE', c[i], e);
-              if(c[i].nodeName === 'UL') {
-                if(this.state.collapsed) {
-                  c[i].classList.add('hide');
-                } else {
-                  c[i].classList.remove('hide');
-                }
-              }
-            // for(var j = 0; j < e.length; j++) {
-            //   // console.log('TOGGLE', e[j]);
-            //   if(e[j].nodeName === 'DIV') {
-            //     if(this.state.collapsed) {
-            //       e[j].classList.add('hide');
-            //     } else {
-            //       e[j].classList.remove('hide');
-            //     }
-            //   }
-            // }
-          // }
       }
+
     });
-    // this.setState({ collapsed: !this.state.collapsed });
+    e.stopPropagation();
 
-    // console.log('TOGGLE OUTER', c, this.state.collapsed);
   }
 
   importDataToEditor(e) {
@@ -259,9 +470,10 @@ class App extends Component {
   }
 
   clickHandler(e, d) {
+    console.log('CLICKED', e.target, d);
     var target = e.target;
     var id = target.getAttribute('id');
-    if(id && id === d.id) {
+    if(d.id) {
 
       this.importDataToEditor(d.data);
       console.log('clicked DATA', id, d.data);
@@ -284,6 +496,7 @@ class App extends Component {
       });
 
     }
+    e.stopPropagation();
   }
 
 
@@ -331,7 +544,7 @@ class App extends Component {
 
   renderButton(i) {
     // console.log('ID', i);
-      return <button id={i} className="collapsedButton"  onClick={(e) => this.toggle(e.target, i)}>{this.state.buttonText}</button>;
+      return <span id={i} className="collapsedButton"  onClick={(e) => this.toggle(e, i)}>{this.state.buttonText}</span>;
     }
 
   renderList(list) {
@@ -361,23 +574,30 @@ class App extends Component {
         //   );
         // }
         // else {
-          var data = this.highlightElement(d.data, this.state.listSearchTerm) || d.data;
+          var deta = d.data.replace(/<(figure|figcaption|img|br).*?>/g, '');
+          // console.log('figure removed', deta);
+
+          var data = this.highlightElement(deta, this.state.listSearchTerm) || deta;
           var title = this.highlightElement(d.title, this.state.listSearchTerm) || d.title;
 
           return (
             <div style={{ display: 'flex' }}>
 
 
-              {d.children && <div>{this.renderButton(d.id)}</div>}
+              {/*d.children && <div>{this.renderButton(d.id)}</div>*/}
 
               <li key={d.id} id={d.id} className="listData" onClick={(e) => { this.clickHandler(e, d); }}>
-                {d.title && <p className="title">{renderHTML(title)}</p>}
-                {renderHTML(this.text_truncate(data,150))}
-                {/*this.renderInput()*/}
-                <span className="delButton" id={d.id} onClick={() => this.deleteItem(d.id)}>
-                  <i className="fa fa-trash" />
-                </span>
-                {d.children && <ul>{this.renderList(d.children)}</ul>}
+                <a>
+                  <p>{d.children && <span>{this.renderButton(d.id)}</span>}{d.title && <span className="title">{renderHTML(title)}</span>}</p>
+
+                  {renderHTML(this.text_truncate(data,150))}
+                  {/*this.renderInput()*/}
+                  <span className="delButton" id={d.id} onClick={() => this.deleteItem(d.id)}>
+                    <i className="fa fa-trash" />
+                  </span>
+                </a>
+
+                {d.children && <div class="message hide"><ul>{this.renderList(d.children)}</ul></div>}
               </li>
             </div>
           );
@@ -409,9 +629,7 @@ class App extends Component {
   highlightElement(text, term) {
     if(text && term) {
       var pattern = new RegExp('('+term+')(?![^<]*>)', 'gi');
-      // var text1 = text.replace(/<mark[^>]*(?:\/>|>(?:\s|&nbsp;)*<\/mark>)/im, '');
       text = text.replace(pattern, '<mark>$1</mark>');
-      // console.log('TEXT', text);
       return text;
     }
 
@@ -441,63 +659,69 @@ class App extends Component {
     var dataOption = this.state.listSearchTerm ? this.searchItem(this.state.listSearchTerm, this.props.item) : this.props.item;
     var list = this.deStructureData(dataOption);
     console.log('LIST deStructureData', list);
-
-    // var text = this.state.editorSearchTerm ?
-
     return (
-      this.state.loggedIn ?
       <div style={{ height: '100vh' }}>
         <Route render={({ history }) => (
           <button onClick={() => this.props.logOut(history)}>logout</button>
         )} />
-        <div style={{ display: 'flex', justifyContent: 'flex-end', margin: 5 }}>
 
-          <button className="button" onClick={(e) => this.onSubmit(e)}>Save</button>
-          <button className="button" onClick={(e) => this.onNewClicked(e)}>New</button>
-          <button className="button" onClick={(e) => this.onChildClicked(e)}>Child node</button>
-        </div>
 
-        <div className="App">
+        <div className="App" id="pane-container">
+          <div style={{ position: 'relative', height: 'inherit', width: '35%', display: this.state.fullScreen ? 'none' : 'block' }}>
+            <div id="pane" className="left-side">
 
-          <div className="right-side">
-            <input placeholder="Search list.." value={this.state.listSearchTerm} onChange={(e) => this.onChangeSearchTerm(e)}/>
+              <input placeholder="Search list.." value={this.state.listSearchTerm} onChange={(e) => this.onChangeSearchTerm(e)}/>
 
-            <ul id="list">
+              <ul id="list">
+                <li>
+                  <ul>
+                    {list !== undefined && this.renderList(list)}
+                  </ul>
+                </li>
 
-              {list !== undefined && this.renderList(list)}
-            </ul>
+              </ul>
 
+
+            </div>
+            <div id="ghostpane"></div>
           </div>
 
-          <div className="editor-container">
+          <div className="editor-container" id="editor">
+          <div style={{ display: 'flex', justifyContent: 'space-between', margin: 5 }}>
+            <button onClick={() => this.setState({ fullScreen: !this.state.fullScreen })}>{this.state.fullScreen ? <i className="fa fa-arrow-right" /> : <i className="fa fa-arrow-left" />}</button>
+            <div style={{ display: 'flex' }}>
+              <Route render={({ history }) => (
+                <button className="button" onClick={(e) => this.onShare(e, history)}>Share</button>
+              )} />
+              <button className="button" onClick={(e) => this.onSubmit(e)}>Save</button>
+              <button className="button" onClick={(e) => this.onNewClicked(e)}>New</button>
+              <button className="button" onClick={(e) => this.onChildClicked(e)}>Child node</button>
+            </div>
+          </div>
             <input placeholder="Title.."
               value={this.state.title}
               onChange={(text) => this.onChangeSearchTerm(text, 'title')}
               disabled = {(this.state.new || this.state.parentEdit)? "" : "disabled"}
               ref={input => this.titleInput = input}
             />
-            {/*<Editor
-              className="editor"
-              value={this.state.inputValue}
-              text={this.state.inputValue}
-              onChange={(text) => this.handleChange(text)}
-            />*/}
+
             <Editor
             ref="editor"
             editorState={this.state.editorState}
+            sideButtons={this.sideButtons}
             onChange={this.onChange} />
           </div>
         </div>
 
-      </div> :
-      <div>Login</div>
+      </div>
     );
   }
 }
 const mapStateToProps = (state) => {
   return {
     item: state.item.items,
+    user: state.user.user
   }
 }
 
-export default connect(mapStateToProps, {addListItem, logOut, fetchItem})(App);
+export default connect(mapStateToProps, {addListItem, logOut, fetchItem, SingleUserFetch})(App);

@@ -39,3 +39,4 @@ export const fetchItem = (id) => {
 }
 
 export * from './AuthAction';
+export * from './UserAction';
